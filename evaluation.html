@@ -703,7 +703,7 @@ footer{position:relative;z-index:1;text-align:center;padding:18px 16px 26px;colo
     </section>
   </main>
 
-  <footer><span data-i18n="footer"></span> · © <span id="year"></span> CEO Group <span style="opacity:.5">· eval v1.1</span></footer>
+  <footer><span data-i18n="footer"></span> · © <span id="year"></span> CEO Group <span style="opacity:.5">· eval v1.2</span></footer>
 </div>
 
 <script>
@@ -770,7 +770,7 @@ const T = {
     pTitle:"مسارك الأكاديمي", pSub:"اكتب رقمك المسجّل عندنا وشوف الخيارات الأكاديمية الإضافية المتاحة لبرنامجك.",
     pBtn:"اعرض الخيارات المتاحة", pHelloSub:"دي الخيارات المتاحة لبرنامجك. اضغط على أي خيار عشان تشوف التفاصيل.",
     pChoose:"اختار:", pNote:"ملاحظة أو سؤال (اختياري)", pGo:"أنا مهتم – تواصلوا معايا",
-    pNeedOpt:"من فضلك اختار من القائمة الأول.", pOk:"تم استلام طلبك ✓", pOkText:"فريق المتابعة هيتواصل معاك قريب. ولو حابب تسرّع، كلّمهم على واتساب.",
+    pNeedOpt:"من فضلك اختار من القائمة الأول.", pOk:"تم استلام طلبك ✓", pOkText:"استلمنا طلبك، وفريق المتابعة هيتواصل معاك قريب.",
     pAlready:(at)=>`طلبت الخدمة دي قبل كده${at ? " يوم " + at : ""} – فريق المتابعة هيتواصل معاك.`,
     pReqd:"تم الطلب ✓", pNone:"مفيش خيارات إضافية متاحة لبرنامجك حالياً. تقدر تكلّم فريق المتابعة لو عندك سؤال.",
     pWa:"كلّم فريق المتابعة على واتساب",
@@ -817,7 +817,7 @@ const T = {
     pTitle:"Your academic path", pSub:"Enter the number registered with us to see the extra academic options open to your programme.",
     pBtn:"Show my options", pHelloSub:"These options are open to your programme. Tap any option for details.",
     pChoose:"Choose:", pNote:"Note or question (optional)", pGo:"I'm interested – contact me",
-    pNeedOpt:"Please choose from the list first.", pOk:"Request received ✓", pOkText:"The follow-up team will contact you soon. To speed things up, message them on WhatsApp.",
+    pNeedOpt:"Please choose from the list first.", pOk:"Request received ✓", pOkText:"We've received your request – our follow-up team will contact you soon.",
     pAlready:(at)=>`You already requested this${at ? " on " + at : ""} – the follow-up team will contact you.`,
     pReqd:"Requested ✓", pNone:"No extra options are open to your programme right now. Message the follow-up team if you have a question.",
     pWa:"Message the follow-up team on WhatsApp",
@@ -1256,7 +1256,7 @@ function renderPath(){
         const was = (s.requested || []).some(r => r.option === o.title);
         return `<button type="button" class="opt${was ? " req" : ""}" role="radio" aria-checked="${ap.pick[k] === i}" data-k="${k}" data-i="${i}"><i></i><span style="flex:1;min-width:0"><b>${esc(o.title)}${was ? " ✓" : ""}</b>${o.details ? `<small>${esc(o.details)}</small>` : ""}</span>${o.price && o.price !== s.price ? `<em>${usd(o.price)}</em>` : ""}</button>`; }).join("")}</div>` : "";
     const body = sent ? `<div class="notice ok svc-ok"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><div><b>${esc(t.pOk)}</b>${esc(sent.already ? t.pAlready(sent.at ? fmtDay(sent.at) : "") : t.pOkText)}</div></div>
-          ${e.whatsapp ? `<a class="wa small" href="${esc(waLink(sent.whatsapp || e.whatsapp, t.pWaMsg(d.name || "", e.group, s.title[lang] + (sent.option ? " – " + sent.option : ""))))}" target="_blank" rel="noopener">${WA_SVG}<span>${esc(t.pWa)}</span></a>` : ""}`
+          `
       : `${reqd && !s.options.length ? `<div class="notice ok svc-ok"><div>${esc(t.pAlready(fmtDay(s.requested[0].at)))}</div></div>` : ""}
          ${opts}
          ${reqd && !s.options.length ? "" : `<input class="svc-note" type="text" maxlength="300" dir="auto" placeholder="${esc(t.pNote)}" data-k="${k}">
