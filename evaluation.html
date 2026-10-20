@@ -466,6 +466,41 @@ footer{position:relative;z-index:1;text-align:center;padding:18px 16px 26px;colo
   font:600 13.5px var(--font-body);color:var(--navy-900);direction:ltr;transition:all .2s var(--ease-out)}
 .pick[aria-checked="true"]{border-color:#1ea952;background:#effbf3;box-shadow:0 0 0 4px rgba(30,169,82,.15)}
 @media (max-width:400px){.star{width:42px;height:42px}.stars{gap:6px}}
+/* ---------- Academic path ---------- */
+.ap-enr{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.ap-enr button{padding:8px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--field);font:600 13px var(--font-body);color:var(--navy-900);cursor:pointer;direction:ltr}
+.ap-enr button[aria-pressed="true"]{border-color:var(--gold-500);background:#fff;box-shadow:0 0 0 4px rgba(249,192,60,.18)}
+.svc{border:1.5px solid var(--line);border-radius:18px;background:#fff;margin-bottom:12px;overflow:hidden;transition:border-color .25s,box-shadow .25s}
+.svc.open{border-color:var(--gold-400);box-shadow:0 14px 30px -18px rgba(12,37,54,.45)}
+.svc-head{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:start;width:100%;padding:14px 16px;background:none;border:0;text-align:start;cursor:pointer;font:inherit;color:inherit}
+.svc-t{font-family:var(--font-display);font-weight:700;font-size:15.5px;color:var(--navy-900);line-height:1.45}
+.svc-d{grid-column:1/-1;font-size:13.5px;color:var(--ink-soft);line-height:1.65}
+.svc-p{text-align:end;white-space:nowrap}
+.svc-p b{display:block;font-family:var(--font-display);font-size:17px;color:var(--navy-900);direction:ltr}
+.svc-p s{font-size:12.5px;color:#9aabb8;direction:ltr;display:inline-block}
+.svc-badge{display:inline-block;margin-top:6px;font-size:11.5px;font-weight:700;color:#8a5a00;background:#fff1c9;border-radius:99px;padding:3px 9px}
+.svc-done{grid-column:1/-1;font-size:12.5px;font-weight:700;color:var(--ok)}
+.svc-body{display:none;padding:0 16px 16px;border-top:1px dashed #dbe3e9}
+.svc.open .svc-body{display:block;animation:fadeUp .35s var(--ease-out)}
+.opt-l{font-weight:600;font-size:14px;color:var(--navy-900);margin:14px 0 8px}
+.opts{display:grid;gap:8px;max-height:320px;overflow:auto;padding:2px}
+.opt{display:flex;gap:10px;align-items:flex-start;text-align:start;padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--field);cursor:pointer;font:inherit;color:var(--navy-900)}
+.opt[aria-checked="true"]{border-color:var(--gold-500);background:#fffaf0;box-shadow:0 0 0 3px rgba(249,192,60,.18)}
+.opt i{flex:none;width:18px;height:18px;margin-top:2px;border-radius:50%;border:2px solid #c9d5df;display:grid;place-items:center}
+.opt[aria-checked="true"] i{border-color:var(--gold-500);background:var(--gold-500)}
+.opt[aria-checked="true"] i::after{content:"";width:6px;height:6px;border-radius:50%;background:#fff}
+.opt b{display:block;font-size:13.5px;direction:ltr;unicode-bidi:isolate}
+.opt small{display:block;font-size:12px;color:var(--ink-soft);margin-top:2px;direction:ltr;unicode-bidi:isolate}
+.opt em{font-style:normal;margin-inline-start:auto;font-weight:700;font-size:13px;color:var(--navy-700);direction:ltr;white-space:nowrap}
+.opt.req{opacity:.6}
+.svc-note{width:100%;margin-top:12px;height:46px;border-radius:12px;border:1.5px solid var(--line);background:var(--field);padding:0 12px;font:14px var(--font-body);color:var(--ink);outline:none}
+.svc-note:focus{border-color:var(--gold-500);background:#fff}
+.svc-go{height:50px;margin-top:12px;font-size:15.5px}
+.svc-err{display:none;margin-top:10px;color:var(--err);font-size:13px}
+.svc-err.show{display:block}
+.svc-ok{margin-top:12px}
+.ap-note{font-size:12.5px;color:var(--ink-soft);text-align:center;margin-top:6px}
+
 </style>
 </head>
 <body>
@@ -540,7 +575,17 @@ footer{position:relative;z-index:1;text-align:center;padding:18px 16px 26px;colo
 
     <!-- Form card -->
     <section class="card-wrap">
-      <div class="card" id="card">
+      <div class="card" id="card" data-tab="attend">
+        <div class="tabs" role="tablist">
+          <i class="tab-pill" aria-hidden="true"></i>
+          <button class="tab" type="button" role="tab" id="tabEval" aria-selected="true" aria-controls="paneEval">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8l2.8 5.7 6.3.9-4.6 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L2.9 9.4l6.3-.9z"/></svg>
+            <span data-i18n="tabEval"></span></button>
+          <button class="tab" type="button" role="tab" id="tabPath" aria-selected="false" aria-controls="panePath">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/></svg>
+            <span data-i18n="tabPath"></span></button>
+        </div>
+        <div class="pane" id="paneEval" role="tabpanel" aria-labelledby="tabEval">
         <!-- step 1: phone -->
         <div class="ev-view" id="vPhone">
           <div class="card-head">
@@ -619,11 +664,46 @@ footer{position:relative;z-index:1;text-align:center;padding:18px 16px 26px;colo
             <button class="again" type="button" id="againBtn" data-i18n="other"></button>
           </div>
         </div>
+        </div>
+
+        <!-- Academic path -->
+        <div class="pane" id="panePath" role="tabpanel" aria-labelledby="tabPath" hidden>
+          <div class="ev-view" id="pPhone">
+            <div class="card-head">
+              <div><h2 data-i18n="pTitle"></h2><p class="sub" data-i18n="pSub"></p></div>
+              <div class="card-badge" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l4-4 3 3 5-6"/></svg></div>
+            </div>
+            <form id="pForm" novalidate autocomplete="on" style="margin-top:20px">
+              <div class="field" id="fPPhone" style="opacity:1;transform:none">
+                <label for="pphone"><span><span data-i18n="phoneLabel"></span> <span class="req">*</span></span></label>
+                <div class="control">
+                  <svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>
+                  <input id="pphone" name="pphone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" required>
+                  <svg class="ok" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                </div>
+                <div class="hint" id="pHint" data-i18n="phoneHint"></div>
+              </div>
+              <button class="submit" type="submit" id="pBtn">
+                <span class="label" data-i18n="pBtn"></span>
+                <svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                <span class="spinner"></span>
+              </button>
+            </form>
+            <div id="pOut" aria-live="polite" style="margin-top:16px"></div>
+          </div>
+          <div class="ev-view" id="pList" hidden>
+            <div class="hello"><div class="avatar" id="pAvatar">A</div><div><div class="hello-t" id="pHello"></div><div class="hello-s" data-i18n="pHelloSub"></div></div></div>
+            <div id="pEnr"></div>
+            <div id="pSvcs"></div>
+            <div class="ap-note" data-i18n="pUsd"></div>
+            <button type="button" class="ev-back" id="pBack" data-i18n="other2"></button>
+          </div>
+        </div>
       </div>
     </section>
   </main>
 
-  <footer><span data-i18n="footer"></span> · © <span id="year"></span> CEO Group <span style="opacity:.5">· eval v1.0</span></footer>
+  <footer><span data-i18n="footer"></span> · © <span id="year"></span> CEO Group <span style="opacity:.5">· eval v1.1</span></footer>
 </div>
 
 <script>
@@ -683,7 +763,19 @@ const T = {
     netErr:"حصلت مشكلة في الاتصال، حاول مرة أخرى بعد لحظات.", srvErr:"تعذّر حفظ التقييم: ",
     privacy:"بياناتك بتُستخدم لتحسين جودة المحاضرات فقط.",
     demo:"وضع المعاينة: الصفحة غير متصلة بالشيت بعد.",
-    footer:"منصة تقييم المحاضرات", rates:RATE_AR
+    footer:"منصة تقييم المحاضرات", rates:RATE_AR,
+    tabEval:"تقييم المحاضرة", tabPath:"مسارك الأكاديمي",
+    eyebrowP:"خطوتك الجاية", h1aP:"مسارك", h1bP:"الأكاديمي",
+    leadP:"خيارات أكاديمية إضافية متاحة لطلاب برنامجك: تخصص إضافي، شهادة مزدوجة، شهادات احترافية، وتوثيق الشهادة.",
+    pTitle:"مسارك الأكاديمي", pSub:"اكتب رقمك المسجّل عندنا وشوف الخيارات الأكاديمية الإضافية المتاحة لبرنامجك.",
+    pBtn:"اعرض الخيارات المتاحة", pHelloSub:"دي الخيارات المتاحة لبرنامجك. اضغط على أي خيار عشان تشوف التفاصيل.",
+    pChoose:"اختار:", pNote:"ملاحظة أو سؤال (اختياري)", pGo:"أنا مهتم – تواصلوا معايا",
+    pNeedOpt:"من فضلك اختار من القائمة الأول.", pOk:"تم استلام طلبك ✓", pOkText:"فريق المتابعة هيتواصل معاك قريب. ولو حابب تسرّع، كلّمهم على واتساب.",
+    pAlready:(at)=>`طلبت الخدمة دي قبل كده${at ? " يوم " + at : ""} – فريق المتابعة هيتواصل معاك.`,
+    pReqd:"تم الطلب ✓", pNone:"مفيش خيارات إضافية متاحة لبرنامجك حالياً. تقدر تكلّم فريق المتابعة لو عندك سؤال.",
+    pWa:"كلّم فريق المتابعة على واتساب",
+    pWaMsg:(n,g,s)=>`السلام عليكم، أنا ${n} من ${g}. مهتم بـ: ${s}. ممكن تفاصيل أكتر؟`,
+    pUsd:"كل الأسعار بالدولار الأمريكي.", other2:"رقم تاني", from:"يبدأ من"
   },
   en:{
     title:"CEO Group | Lecture evaluation",
@@ -718,7 +810,19 @@ const T = {
     netErr:"Connection problem. Please try again in a moment.", srvErr:"Couldn't save the evaluation: ",
     privacy:"Your details are used to improve lecture quality only.",
     demo:"Preview mode: not connected to the sheet yet.",
-    footer:"Lecture evaluation platform", rates:RATE_EN
+    footer:"Lecture evaluation platform", rates:RATE_EN,
+    tabEval:"Rate the lecture", tabPath:"Your academic path",
+    eyebrowP:"Your next step", h1aP:"Your academic", h1bP:"path",
+    leadP:"Extra academic options open to students of your programme: a second specialisation, a double degree, professional certificates and attestation.",
+    pTitle:"Your academic path", pSub:"Enter the number registered with us to see the extra academic options open to your programme.",
+    pBtn:"Show my options", pHelloSub:"These options are open to your programme. Tap any option for details.",
+    pChoose:"Choose:", pNote:"Note or question (optional)", pGo:"I'm interested – contact me",
+    pNeedOpt:"Please choose from the list first.", pOk:"Request received ✓", pOkText:"The follow-up team will contact you soon. To speed things up, message them on WhatsApp.",
+    pAlready:(at)=>`You already requested this${at ? " on " + at : ""} – the follow-up team will contact you.`,
+    pReqd:"Requested ✓", pNone:"No extra options are open to your programme right now. Message the follow-up team if you have a question.",
+    pWa:"Message the follow-up team on WhatsApp",
+    pWaMsg:(n,g,s)=>`Hello, I'm ${n} from ${g}. I'm interested in: ${s}. Could you send me more details?`,
+    pUsd:"All prices are in US dollars.", other2:"Another number", from:"from"
   }
 };
 /* =========================================================
@@ -768,6 +872,7 @@ function applyLang(l, animate){
   const tg = $("#langToggle"); tg.dataset.lang = l;
   tg.querySelectorAll("span").forEach(s => s.classList.toggle("active", s.dataset.l === l));
   buildStars(); renderPhoneOut(); renderRate(); fillDone();
+  $("#pphone").placeholder = t.phonePh; heroTexts(); renderPOut(); renderPath();
   tickClock(); store("ceo_lang", l);
   if (animate && !reduceMotion){
     const h = document.querySelector("h1");
@@ -1061,6 +1166,141 @@ function tickClock(){
 }
 
 /* =========================================================
+   6) Tabs + academic path
+   ========================================================= */
+let tab = "eval";
+const ap = { phone:"", data:null, out:null, enr:0, open:null, pick:{}, sent:{}, busy:false };
+const usd = n => "$" + Number(n).toLocaleString("en-US");
+function setTab(t, focus){
+  tab = t;
+  $("#card").dataset.tab = t === "path" ? "lecture" : "attend";
+  $("#tabEval").setAttribute("aria-selected", t === "eval");
+  $("#tabPath").setAttribute("aria-selected", t === "path");
+  ["paneEval","panePath"].forEach(id => { const show = (id === "paneEval") === (t === "eval"); const el = $("#"+id); el.hidden = !show;
+    if (show){ el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); } });
+  heroTexts();
+  try{ history.replaceState(null, "", t === "path" ? "#path" : location.pathname + location.search); }catch(e){}
+  if (t === "path"){
+    const p = $("#pphone");
+    if (!p.value && (ev.phone || $("#phone").value)) p.value = ev.phone || $("#phone").value;
+    if (focus && $("#pList").hidden) setTimeout(() => p.focus({preventScroll:true}), 200);
+  }
+}
+function heroTexts(){
+  const t = T[lang], P = tab === "path";
+  document.querySelector('[data-i18n="eyebrow"]').textContent = P ? t.eyebrowP : t.eyebrow;
+  document.querySelector('[data-i18n="h1a"]').textContent = P ? t.h1aP : t.h1a;
+  document.querySelector('[data-i18n="h1b"]').textContent = P ? t.h1bP : t.h1b;
+  document.querySelector('[data-i18n="lead"]').textContent = P ? t.leadP : t.lead;
+  document.querySelector(".steps").style.display = P ? "none" : "";
+}
+function demoPath(p){
+  if (+p.slice(-1) % 2) return demoCheck(p);
+  return { ok:true, found:true, name:"Ahmed M.", enrollments:[{ accreditation:"EIU MBA", group:"EIU MBA · Group 2", whatsapp:"201044015001", services:[
+    {id:"DD-AITU-MBA", title:{ar:"شهادة مزدوجة (Double Degree) – ماجستير من AITU", en:"Double Degree – Master's from AITU"}, desc:{ar:"إضافة لشهادتك من EIU، تقدر تحصل على شهادة ماجستير في نفس التخصص من جامعة AITU.", en:"Alongside your EIU degree, receive a Master's from AITU."}, price:1000, oldPrice:0, badge:{ar:"",en:""}, options:[], requested:[]},
+    {id:"ALT-THESIS", title:{ar:"مادتين بدل الرسالة", en:"Two modules instead of the thesis"}, desc:{ar:"تقدر تستبدل رسالة الماجستير بمادتين دراسيتين حسب تخصصك.", en:"Replace the thesis with two modules."}, price:200, oldPrice:340, badge:{ar:"منحة حالية",en:"Current scholarship"}, options:[{title:"Marketing Management", details:"Advanced Marketing & International Marketing + Corporate Communication", price:0},{title:"Finance Management", details:"Financial Institutions & Managerial Economics + Research Methodology or Entrepreneurship", price:0}], requested:[]}]}]};
+}
+function setPState(ok, msg){ const f = $("#fPPhone"); f.classList.toggle("invalid", !ok); f.classList.toggle("valid", ok); $("#pHint").textContent = msg || T[lang].phoneHint; }
+async function startPath(e){
+  if (e) e.preventDefault();
+  if (ap.busy) return;
+  const p = normalizePhone($("#pphone").value);
+  if (!isValidPhone(p)){ setPState(false, T[lang].phoneErr); $("#pphone").focus(); return; }
+  setPState(true);
+  ap.busy = true; $("#pBtn").classList.add("loading"); ap.out = {loading:true}; renderPOut();
+  let d;
+  try{ d = CONFIG.SCRIPT_URL ? await api({action:"pathcheck", phone:p}) : (await new Promise(r => setTimeout(r, 700)), demoPath(p)); }
+  catch(err){ d = null; }
+  ap.busy = false; $("#pBtn").classList.remove("loading");
+  if (!d || !d.ok){ ap.out = {error:true}; renderPOut(); return; }
+  ap.phone = p;
+  if (!d.found){ ap.out = Object.assign({nf:true}, d); renderPOut(); return; }
+  ap.out = null; renderPOut();
+  ap.data = d; ap.enr = 0; ap.open = null; ap.pick = {}; ap.sent = {};
+  renderPath(); $("#pPhone").hidden = true; $("#pList").hidden = false;
+  $("#card").scrollIntoView({behavior: reduceMotion ? "auto" : "smooth", block:"nearest"});
+}
+function renderPOut(){
+  const o = ap.out, host = $("#pOut"), t = T[lang];
+  if (!o){ host.innerHTML = ""; return; }
+  if (o.loading){ host.innerHTML = `<div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:14px;background:var(--field);color:var(--ink-soft);font-size:14.5px"><span class="dots"><i></i><i></i><i></i></span>${esc(t.searching)}</div>`; return; }
+  if (o.error){ host.innerHTML = `<div class="notice err"><span>${esc(t.lookupErr)}</span> <button type="button" class="link" id="pRetry">${esc(t.retry)}</button></div>`; $("#pRetry").onclick = () => startPath(); return; }
+  const C = (o.contacts || []).filter(c => c.whatsapp);
+  host.innerHTML = `<div class="notice">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 7.5v5.5"/><path d="M12 16.5h.01"/></svg>
+      <div><b>${esc(t.nfTitle)}</b>${esc(t.nfText.replace("التقييم متاح", "الخدمات دي متاحة").replace("Evaluations are", "These options are"))}</div></div>
+    ${C.length > 1 ? `<div class="pick-label">${esc(t.pickProg)}</div><div class="picks" role="radiogroup">${C.map((c,i) => `<button type="button" class="pick" role="radio" aria-checked="${o.pickIdx === i}" data-i="${i}">${esc(c.label)}</button>`).join("")}</div>` : ""}
+    ${C.length ? `<a class="wa" target="_blank" rel="noopener" ${C.length > 1 && o.pickIdx == null ? 'aria-disabled="true"' : `href="${esc(waLink(C[o.pickIdx || 0].whatsapp, t.waMsg(ap.phone, C[o.pickIdx || 0].label)))}"`}>${WA_SVG}<span>${esc(t.waBtn)}</span></a>` : ""}`;
+  host.querySelectorAll(".pick").forEach(b => b.addEventListener("click", () => { o.pickIdx = +b.dataset.i; renderPOut(); }));
+}
+function renderPath(){
+  const d = ap.data, t = T[lang];
+  if (!d) return;
+  $("#pAvatar").textContent = (d.name || "?").charAt(0);
+  $("#pHello").innerHTML = t.hello(esc(d.name || ""));
+  const E = d.enrollments;
+  $("#pEnr").innerHTML = E.length > 1 ? `<div class="ap-enr">${E.map((e,i) => `<button type="button" aria-pressed="${i === ap.enr}" data-i="${i}">${esc(e.accreditation)}</button>`).join("")}</div>` : "";
+  $("#pEnr").querySelectorAll("button").forEach(b => b.addEventListener("click", () => { ap.enr = +b.dataset.i; ap.open = null; renderPath(); }));
+  const e = E[ap.enr], S = e.services || [];
+  if (!S.length){
+    $("#pSvcs").innerHTML = `<div class="notice">${esc(t.pNone)}</div>` + (e.whatsapp ? `<a class="wa" href="${esc(waLink(e.whatsapp, t.pWaMsg(d.name || "", e.group, "")))}" target="_blank" rel="noopener">${WA_SVG}<span>${esc(t.pWa)}</span></a>` : "");
+    return;
+  }
+  $("#pSvcs").innerHTML = S.map(s => {
+    const k = ap.enr + "|" + s.id, open = ap.open === k, sent = ap.sent[k];
+    const prices = s.options.filter(o => o.price).map(o => o.price);
+    const minP = Math.min(s.price, ...(prices.length ? prices : [s.price]));
+    const pr = s.oldPrice ? `<s>${usd(s.oldPrice)}</s><b>${usd(s.price)}</b>` : (minP < s.price ? `<small style="display:block;font-size:11.5px;font-weight:600;color:var(--ink-soft)">${esc(t.from)}</small><b>${usd(minP)}</b>` : `<b>${usd(s.price)}</b>`);
+    const reqd = s.requested && s.requested.length;
+    const opts = s.options.length ? `<div class="opt-l">${esc(t.pChoose)}</div><div class="opts" role="radiogroup">${s.options.map((o,i) => {
+        const was = (s.requested || []).some(r => r.option === o.title);
+        return `<button type="button" class="opt${was ? " req" : ""}" role="radio" aria-checked="${ap.pick[k] === i}" data-k="${k}" data-i="${i}"><i></i><span style="flex:1;min-width:0"><b>${esc(o.title)}${was ? " ✓" : ""}</b>${o.details ? `<small>${esc(o.details)}</small>` : ""}</span>${o.price && o.price !== s.price ? `<em>${usd(o.price)}</em>` : ""}</button>`; }).join("")}</div>` : "";
+    const body = sent ? `<div class="notice ok svc-ok"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><div><b>${esc(t.pOk)}</b>${esc(sent.already ? t.pAlready(sent.at ? fmtDay(sent.at) : "") : t.pOkText)}</div></div>
+          ${e.whatsapp ? `<a class="wa small" href="${esc(waLink(sent.whatsapp || e.whatsapp, t.pWaMsg(d.name || "", e.group, s.title[lang] + (sent.option ? " – " + sent.option : ""))))}" target="_blank" rel="noopener">${WA_SVG}<span>${esc(t.pWa)}</span></a>` : ""}`
+      : `${reqd && !s.options.length ? `<div class="notice ok svc-ok"><div>${esc(t.pAlready(fmtDay(s.requested[0].at)))}</div></div>` : ""}
+         ${opts}
+         ${reqd && !s.options.length ? "" : `<input class="svc-note" type="text" maxlength="300" dir="auto" placeholder="${esc(t.pNote)}" data-k="${k}">
+         <button class="submit svc-go" type="button" data-k="${k}"><span class="label">${esc(t.pGo)}</span><span class="spinner"></span></button>
+         <div class="svc-err" data-k="${k}">${esc(t.pNeedOpt)}</div>`}`;
+    return `<div class="svc${open ? " open" : ""}">
+      <button type="button" class="svc-head" aria-expanded="${open}" data-k="${k}">
+        <span><span class="svc-t">${esc(s.title[lang])}</span>${s.badge && s.badge[lang] ? `<br><span class="svc-badge">${esc(s.badge[lang])}</span>` : ""}</span>
+        <span class="svc-p">${pr}</span>
+        <span class="svc-d">${esc(s.desc[lang])}</span>
+        ${reqd || sent ? `<span class="svc-done">${esc(t.pReqd)}</span>` : ""}
+      </button>
+      <div class="svc-body">${body}</div></div>`;
+  }).join("");
+  const host = $("#pSvcs");
+  host.querySelectorAll(".svc-head").forEach(b => b.addEventListener("click", () => { ap.open = ap.open === b.dataset.k ? null : b.dataset.k; renderPath(); }));
+  host.querySelectorAll(".opt").forEach(b => b.addEventListener("click", () => { ap.pick[b.dataset.k] = +b.dataset.i; host.querySelectorAll(`.opt[data-k="${b.dataset.k}"]`).forEach(x => x.setAttribute("aria-checked", x === b)); host.querySelector(`.svc-err[data-k="${b.dataset.k}"]`)?.classList.remove("show"); }));
+  host.querySelectorAll(".svc-go").forEach(b => { b.addEventListener("pointerdown", ripple); b.addEventListener("click", () => sendPath(b.dataset.k, b)); });
+}
+async function sendPath(k, btn){
+  const [ei, sid] = [+k.split("|")[0], k.split("|").slice(1).join("|")];
+  const e = ap.data.enrollments[ei], s = e.services.find(x => x.id === sid);
+  if (s.options.length && ap.pick[k] == null){ $(`.svc-err[data-k="${k}"]`).classList.add("show"); return; }
+  const option = s.options.length ? s.options[ap.pick[k]].title : "";
+  const note = ($(`.svc-note[data-k="${k}"]`) || {}).value || "";
+  btn.classList.add("loading");
+  const payload = { form:"path", phone:ap.phone, accreditation:e.accreditation, serviceId:s.id, option, note:note.trim(), submissionId:uuid(), source:CONFIG.SOURCE, lang };
+  let r;
+  try{
+    if (!CONFIG.SCRIPT_URL){ await new Promise(x => setTimeout(x, 700)); r = {ok:true, whatsapp:e.whatsapp}; }
+    else{
+      const res = await fetch(CONFIG.SCRIPT_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload), redirect:"follow"});
+      r = JSON.parse(await res.text());
+    }
+  }catch(x){ r = {ok:false}; }
+  btn.classList.remove("loading");
+  if (!r || !r.ok){ const el = $(`.svc-err[data-k="${k}"]`); el.textContent = r && r.code === "OPTION" ? T[lang].pNeedOpt : T[lang].netErr; el.classList.add("show"); return; }
+  ap.sent[k] = { already:!!r.already, at:r.at || "", whatsapp:r.whatsapp, option };
+  if (!r.already){ s.requested = (s.requested || []).concat([{option, at:""}]); if (!reduceMotion) confetti(); }
+  renderPath();
+}
+function resetPath(){ ap.data = null; ap.out = null; $("#pphone").value = ""; setPState(true); $("#fPPhone").classList.remove("valid"); renderPOut(); $("#pList").hidden = true; $("#pPhone").hidden = false; setTimeout(() => $("#pphone").focus({preventScroll:true}), 200); }
+
+/* =========================================================
    7) Init
    ========================================================= */
 document.addEventListener("DOMContentLoaded", () => {
@@ -1087,6 +1327,13 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#comment").addEventListener("input", e => { $("#cCount").textContent = e.target.value.length; });
   $("#backBtn").addEventListener("click", resetAll);
   $("#againBtn").addEventListener("click", resetAll);
+  $("#tabEval").addEventListener("click", () => setTab("eval", true));
+  $("#tabPath").addEventListener("click", () => setTab("path", true));
+  $("#pForm").addEventListener("submit", startPath);
+  $("#pBtn").addEventListener("pointerdown", ripple);
+  $("#pBack").addEventListener("click", resetPath);
+  $("#pphone").addEventListener("input", e => { const n = toLatinDigits(e.target.value); if (n !== e.target.value) e.target.value = n; if ($("#fPPhone").classList.contains("invalid")) setPState(true); if (ap.out && !ap.out.loading){ ap.out = null; renderPOut(); } });
+  if (location.hash === "#path") setTab("path", false);
 });
 
 </script>
