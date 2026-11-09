@@ -16,7 +16,7 @@
  *  H..O formulas (date, day, time, entry, quality, phone key, student name, group) | P Typed Name (unregistered)
  */
 
-const CODE_VERSION = 'v8.9';
+const CODE_VERSION = 'v9.5';
 
 const SETTINGS = {
   RESPONSES_SHEET: 'Form Responses 1',
@@ -415,7 +415,7 @@ function syncDevClients_() {
     const col = function (re) { return h.findIndex(function (x) { return re.test(x); }); };
     const C = { opp: col(/available opportunities/), mob: col(/^mob/), ar: col(/name in arabic/), en: col(/name in english/), mail: col(/e-?mail/), prog: col(/^programs/),
                 det: col(/opportunity details/), stat: col(/studying status/), cert: col(/certificate status/), acc: col(/accreditations/), emp: col(/assigned employee/) };
-    const g = function (r, i) { return i >= 0 ? String(r[i] === null || r[i] === undefined ? '' : r[i]).trim() : ''; };
+    const g = function (r, i) { const x = i >= 0 ? String(r[i] === null || r[i] === undefined ? '' : r[i]).trim() : ''; return /^'?#(N\/A|REF!|VALUE!|ERROR!)/.test(x) ? '' : x; };
     for (let r = 1; r < v.length; r++) {
       const nums = splitPhones_(g(v[r], C.mob)), keys = nums.map(function (n) { return n.slice(-9); });
       if (!keys.length || keys.some(function (k) { return seen[k]; })) continue;
@@ -892,6 +892,60 @@ function addMissingLiveRows_(url) {
   return 'added ' + add.length + ' lectures from the live sheet (' + Utilities.formatDate(add[0][0], SETTINGS.TIMEZONE, 'dd/MM') + ' → ' + Utilities.formatDate(add[add.length - 1][0], SETTINGS.TIMEZONE, 'dd/MM/yyyy') + ')';
 }
 
+/* =========================== Archive (v9.4): old rows leave the working tabs, reports keep counting them =========================== */
+const ARCH = { LEC: 'Lectures Archive', AS: 'Assignments Archive' };
+function archiveSheet_(name, head) {
+  let sh = sheet_(name);
+  if (!sh) {
+    sh = SpreadsheetApp.getActive().insertSheet(name);
+    sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold').setBackground('#6b7f8e').setFontColor('#ffffff');
+    sh.setFrozenRows(1); sh.setTabColor('#9aa7b1');
+  }
+  return sh;
+}
+/** Moves Lectures before lecFrom and Assignments (by session date) before asFrom to the archive tabs, as values. */
+function archiveOld_(lecFrom, asFrom) {
+  const msg = [];
+  // Lectures
+  const lw = sheet_(LEC.SHEET), last = lastDataRow_(lw, 1);
+  if (last >= 2) {
+    const head = lw.getRange(1, 1, 1, LX.WIDTH).getValues()[0], v = lw.getRange(2, 1, last - 1, LX.WIDTH).getValues();
+    const old = v.filter(function (r) { return r[0] instanceof Date && cairoKey_(r[0]) < cairoKey_(lecFrom); });
+    if (old.length) {
+      const ar = archiveSheet_(ARCH.LEC, head), at = lastDataRow_(ar, 1) + 1;
+      ar.getRange(at, 1, old.length, LX.WIDTH).setValues(old);
+      const keep = v.filter(function (r) { return !(r[0] instanceof Date && cairoKey_(r[0]) < cairoKey_(lecFrom)); })
+        .map(function (r) { const c = r.slice(); c[1] = ''; c[15] = ''; c[16] = ''; c[18] = ''; return c; });
+      writeLectures_(keep, false);
+      msg.push('lectures archived ' + old.length + ', kept ' + keep.length);
+    }
+  }
+  // Assignments (formula columns go to the archive as their values)
+  const as = sheet_(AS.SHEET), al = as ? lastDataRow_(as, AS.AGENT) : 1;
+  if (al >= 2) {
+    const W = as.getLastColumn(), head = as.getRange(1, 1, 1, W).getValues()[0], v = as.getRange(2, 1, al - 1, W).getValues();
+    const isOld = function (r) { const d = toDate_(r[AS.DATE - 1]); return d && cairoKey_(d) < cairoKey_(asFrom); };
+    const old = v.filter(isOld);
+    if (old.length) {
+      const ar = archiveSheet_(ARCH.AS, head), at = lastDataRow_(ar, 1) + 1;
+      ar.getRange(at, 1, old.length, W).setValues(old);
+      for (let i = v.length - 1; i >= 0; ) {           // delete bottom-up, one block of consecutive old rows at a time
+        if (!isOld(v[i])) { i--; continue; }
+        let j = i; while (j - 1 >= 0 && isOld(v[j - 1])) j--;
+        as.deleteRows(j + 2, i - j + 1); i = j - 1;
+      }
+      msg.push('assignments archived ' + old.length + ', kept ' + (v.length - old.length));
+    }
+  }
+  // Dashboard: this month's lecture counts also count the archive
+  const db = sheet_(T.DASH);
+  if (db) ['P64', 'P65', 'P66', 'P67'].forEach(function (a) {
+    const f = db.getRange(a).getFormula();
+    if (f && f.indexOf('Lectures Archive') === -1 && f.indexOf('Lectures!') !== -1) db.getRange(a).setFormula(f + '+' + f.slice(1).split('Lectures!').join("'Lectures Archive'!"));
+  });
+  return msg.join(' · ') || 'nothing to archive';
+}
+
 /** Replaces the Lectures values (formula columns untouched). merge=true keeps attendance already recorded in the tab (same day + group). */
 function writeLectures_(rows, merge) {
   const lw = sheet_(LEC.SHEET);
@@ -1080,7 +1134,9 @@ function attendanceData_() {
   const fromKey = from ? dayStart_(from) : 99999999;
   // lectures
   const lw = sheet_(LEC.SHEET), last = lastDataRow_(lw, 1);
-  const lv = last >= 2 ? lw.getRange(2, 1, last - 1, LX.WIDTH).getValues() : [];
+  let lv = last >= 2 ? lw.getRange(2, 1, last - 1, LX.WIDTH).getValues() : [];
+  const la = sheet_(ARCH.LEC), lal = la ? lastDataRow_(la, 1) : 1;   // archived lectures still count in every report
+  if (lal >= 2) lv = la.getRange(2, 1, lal - 1, LX.WIDTH).getValues().concat(lv);
   const byGroup = {};
   lv.forEach(function (r) {
     if (!(r[0] instanceof Date) || !String(r[3]).trim()) return;
@@ -1291,15 +1347,15 @@ function activeByGroup_(D) { const o = {}; D.students.forEach(function (s) { if 
 /** Writes a list of [row values, kind] blocks into a fresh report tab with the house formatting. */
 /* =========================== Charts beside the reports (data in the hidden "Chart Data" tab) =========================== */
 const CHART_SHEET = 'Chart Data';
-const CHART_BAND = { 'Manager Summary': 1, 'Attendance Report': 41, 'Doctors Report': 81, 'Academic Path Report': 121, 'Students Follow-up': 161 };
+const CHART_BAND = { 'Manager Summary': 1, 'Attendance Report': 41, 'Doctors Report': 81, 'Academic Path Report': 121, 'Students Follow-up': 161, 'Lecture Attendance': 201 };
 const CHART_COLORS = ['#174560', '#2e7d5b', '#c0392b', '#d99a1e', '#7a4bb3', '#6b7f8e', '#1f8fb5', '#9a6a00'];
 /** specs: { row, title, type: 'COLUMN' | 'BAR' | 'LINE' | 'PIE', header: [...], data: [[label, n, ...]], stacked, max, h, w } */
 function drawCharts_(rp, col, specs) {
   let cd = sheet_(CHART_SHEET);
   if (!cd) cd = SpreadsheetApp.getActive().insertSheet(CHART_SHEET);
-  if (cd.getMaxColumns() < 240) cd.insertColumnsAfter(cd.getMaxColumns(), 240 - cd.getMaxColumns());
+  if (cd.getMaxColumns() < 280) cd.insertColumnsAfter(cd.getMaxColumns(), 280 - cd.getMaxColumns());
   cd.hideSheet();
-  const band = CHART_BAND[rp.getName()] || 201;
+  const band = CHART_BAND[rp.getName()] || 241;
   // lay the data blocks out first; if the layout is the one already drawn, keep the charts and only rewrite the numbers
   let r0 = 1;
   const plan = (specs || []).map(function (sp) {
@@ -1431,99 +1487,180 @@ function buildDoctorsReport_(D, runs, evals) {
 /* =========================== Manager Summary (one tab, refreshed every 10 minutes) =========================== */
 function dayKeyAdd_(key, n) { const d = new Date(+String(key).slice(0, 4), +String(key).slice(4, 6) - 1, +String(key).slice(6, 8)); d.setDate(d.getDate() + n); return dayStart_(d); }
 function buildManagerSummary_(D, runs, evals) {
-  const tz = SETTINGS.TIMEZONE, W = 6, rows = [], act = activeByGroup_(D), today = D.today;
+  const tz = SETTINGS.TIMEZONE, W = 7, rows = [], act = activeByGroup_(D), today = D.today, TARGET = 50;
   const row = function (v, k, cc, color) { rows.push([v, k, color ? cc : 0, color]); };
-  const w0 = dayKeyAdd_(today, -6), p0 = dayKeyAdd_(today, -13), p1 = dayKeyAdd_(today, -7);   // last 7 days incl. today, the 7 before
-  const inW = function (k) { return k >= w0 && k <= today; }, inP = function (k) { return k >= p0 && k <= p1; };
+  const k2d = function (k) { return new Date(+String(k).slice(0, 4), +String(k).slice(4, 6) - 1, +String(k).slice(6, 8), 12); };
+  const fmt = function (k) { return Utilities.formatDate(k2d(k), tz, 'dd/MM'); };
+  // the week runs Saturday 00:00 → Friday 24:00
+  const sat = dayKeyAdd_(today, -((k2d(today).getDay() + 1) % 7)), fri = dayKeyAdd_(sat, 6);
+  const pSat = dayKeyAdd_(sat, -7), pFri = dayKeyAdd_(sat, -1);
+  const inWeek = function (a, b) { return function (k) { return k >= a && k <= b; }; };
+  const thisW = inWeek(sat, fri), lastW = inWeek(pSat, pFri);
   const allL = []; Object.keys(D.byGroup).forEach(function (g) { D.byGroup[g].forEach(function (x) { if (x.isLecture) allL.push(x); }); });
-  const attOver = function (inside, group) {
-    let s = 0, a = 0;
-    allL.forEach(function (x) {
-      if (x.status !== 'Held' || !x.tracked || !inside(x.day) || (group && x.group !== group)) return;
-      const exp = (act[x.group] || []).filter(function (st) { return startedBy_(st, x.day); });
-      s += exp.length; a += exp.filter(function (st) { return attended_(D, String(st[SC.KEY - 1]).trim(), x.day); }).length;
-    });
-    return s ? Math.round(a / s * 100) : '';
+  const groupWeek = function (g, inside) {   // students of the group / how many attended at least one lecture that week
+    const held = allL.filter(function (x) { return x.group === g && x.status === 'Held' && x.tracked && inside(x.day); });
+    const studs = (act[g] || []).filter(function (s) { return held.some(function (x) { return startedBy_(s, x.day); }); });
+    const came = studs.filter(function (s) { const k = String(s[SC.KEY - 1]).trim(); return held.some(function (x) { return attended_(D, k, x.day); }); }).length;
+    return { lectures: held.length, studs: studs.length, came: came, pct: studs.length ? Math.round(came / studs.length * 100) : null };
   };
-  const cnt = function (f) { return allL.filter(f).length; };
-  const evIn = function (inside) { return evals.filter(function (e) { return inside(dayStart_(e.d)); }); };
-  const pct = function (v) { return v === '' ? '—' : v + '%'; };
-  const arrow = function (a, b, unit) { if (a === '' || b === '' || a === '—' || b === '—') return ''; const d = Math.round((a - b) * 10) / 10; return d > 0 ? '▲ ' + d + (unit || '') : d < 0 ? '▼ ' + Math.abs(d) + (unit || '') : 'زي ما هو'; };
-  row(['ملخص المدير'], 'title');
-  row(['آخر تحديث ' + Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm') + ' · "الأسبوع ده" = آخر 7 أيام · الطلبة اللي محتاجين متابعة في تاب Students Follow-up'], 'note');
-  // 1 · the week in numbers
-  const evW = evIn(inW), evP = evIn(inP);
-  row([], 'gap'); row(['1 · الأسبوع بالأرقام'], 'section'); const cR1 = rows.length;
-  row(['', 'الأسبوع ده', 'الأسبوع اللي فات', 'الفرق'], 'head');
-  const aw = attOver(inW), ap0 = attOver(inP), dw = avg_(evW, function (e) { return e.dr; }), dp = avg_(evP, function (e) { return e.dr; });
-  const hw = cnt(function (x) { return x.status === 'Held' && inW(x.day); }), hp = cnt(function (x) { return x.status === 'Held' && inP(x.day); });
-  const cw = cnt(function (x) { return x.wasCancelled && inW(x.origDay); }), cp = cnt(function (x) { return x.wasCancelled && inP(x.origDay); });
-  [['محاضرات اتعملت', hw, hp, arrow(hw, hp)],
-   ['محاضرات اتلغت', cw, cp, arrow(cw, cp)],
-   ['نسبة الحضور', pct(aw), pct(ap0), arrow(aw, ap0, '%')],
-   ['تقييم الدكاترة (من 5)', dw === '' ? '—' : dw, dp === '' ? '—' : dp, arrow(dw, dp)],
-   ['عدد التقييمات', evW.length, evP.length, arrow(evW.length, evP.length)]
-  ].forEach(function (x) { row(x, 'Held'); });
-  row(['طلبة بيدرسوا دلوقتي', D.students.filter(function (s) { return String(s[SC.STATUS - 1]) === ACTIVE_STATUS; }).length, '', ''], 'Held');
-  // 2 · attendance per group this week
-  const groups = Object.keys(act).filter(function (g) { return (D.byGroup[g] || []).some(function (x) { return Math.abs(x.d - new Date()) < 35 * 864e5; }); }).sort();   // running groups
-  row([], 'gap'); row(['2 · الحضور لكل جروب'], 'section'); const cR2 = rows.length;
-  row(['الجروب', 'محاضرات الأسبوع ده', 'الحضور الأسبوع ده', 'الحضور الأسبوع اللي فات', 'طلبة بيدرسوا'], 'head');
-  const gChart = [];
+  const color = function (p) { return p === null ? null : p >= TARGET ? '#1e7a46' : p >= TARGET * 0.6 ? '#9a6a00' : '#a52f2f'; };
+  row(['تقرير المدير'], 'title');
+  row(['الأسبوع الحالي: السبت ' + fmt(sat) + ' → الجمعة ' + fmt(fri) + ' · بيتجدد لوحده كل سبت · هدف الحضور ' + TARGET + '% على الأقل · آخر تحديث ' + Utilities.formatDate(new Date(), tz, 'dd/MM HH:mm')], 'note');
+  // 1 · attendance per group
+  const groups = Object.keys(act).filter(function (g) { return (D.byGroup[g] || []).some(function (x) { return Math.abs(x.d - new Date()) < 35 * 864e5; }); }).sort();
+  row([], 'gap'); row(['1 · الحضور في الجروبات'], 'section'); const cR1 = rows.length;
+  row(['الجروب', 'الدكتور', 'المادة', 'عدد الطلبة', 'حضروا الأسبوع ده', 'نسبة الحضور', 'الأسبوع اللي فات'], 'head');
+  const chart1 = [];
+  let tS = 0, tC = 0;
   groups.forEach(function (g) {
-    const h = cnt(function (x) { return x.group === g && x.status === 'Held' && inW(x.day); });
-    const a1 = attOver(inW, g), a2 = attOver(inP, g);
-    row([g, h, h ? pct(a1) : 'مفيش محاضرات', pct(a2), (act[g] || []).length], 'Held', 3, a1 === '' ? null : a1 >= 75 ? '#1e7a46' : a1 >= 50 ? '#9a6a00' : '#a52f2f');
-    if (a1 !== '') gChart.push([g, a1]);
+    // who teaches them this week: the module with lectures this week → the one running → the next one (with its start) → the last one
+    const gr = runs.filter(function (r) { return r.group === g; });
+    let run = gr.filter(function (r) { return r.rows.some(function (x) { return x.isLecture && thisW(x.day); }); })[0] || gr.filter(function (r) { return r.status === 'Running'; })[0];
+    let note = '';
+    if (!run) { run = gr.filter(function (r) { return r.status === 'Upcoming'; }).sort(function (a, b) { return a.start - b.start; })[0]; if (run) note = ' (تبدأ ' + Utilities.formatDate(run.start, tz, 'dd/MM') + ')'; }
+    if (!run) run = gr.sort(function (a, b) { return b.end - a.end; })[0] || {};
+    const w = groupWeek(g, thisW), p = groupWeek(g, lastW);
+    tS += w.studs; tC += w.came;
+    row([g, run.doctor || '—', (run.module || '—') + note, (act[g] || []).length, w.lectures ? w.came : 'مفيش محاضرات', w.pct === null ? '—' : w.pct + '%', p.pct === null ? '—' : p.pct + '%'],
+        'Held', 6, color(w.pct));
+    if (w.pct !== null) chart1.push([g, w.pct, TARGET]);
   });
-  // 3 · next 7 days – what is missing
-  const n7 = dayKeyAdd_(today, 7), gaps = [];
-  allL.forEach(function (x) {
-    if (x.day < today || x.day > n7 || x.status === 'Cancelled' || x.status === 'Held') return;
-    const miss = []; if (!x.zoom) miss.push('لينك الزووم'); if (!x.doctor) miss.push('الدكتور'); if (!lecMinutes_(x.time)) miss.push('الميعاد');
-    if (miss.length) gaps.push([shortDate_(x.d) + ' · ' + Utilities.formatDate(x.d, tz, 'EEEE'), x.group, x.module, 'محاضرة ' + x.n, 'ناقص: ' + miss.join('، ')]);
-  });
-  gaps.sort(function (a, b) { return a[0].slice(0, 10).split('/').reverse().join('').localeCompare(b[0].slice(0, 10).split('/').reverse().join('')); });
-  row([], 'gap'); row(['3 · محاضرات الأسبوع الجاي ناقصها حاجة (' + gaps.length + ')'], 'section');
-  row(['اليوم', 'الجروب', 'المادة', 'المحاضرة', 'المطلوب'], 'head');
-  if (!gaps.length) row(['كل محاضرات الأسبوع الجاي فيها لينك ودكتور وميعاد.'], 'note');
-  gaps.forEach(function (g) { row(g, 'Today', 5, '#a52f2f'); });
-  // 4 · cancellations this month
+  const tot = tS ? Math.round(tC / tS * 100) : null;
+  row(['الإجمالي', '', '', groups.reduce(function (a, g) { return a + (act[g] || []).length; }, 0), tC, tot === null ? '—' : tot + '%', ''], 'Running', 6, color(tot));
+  // 2 · development path requests (count only)
+  const rq = sheet_(AP.REQ), rl = rq ? lastDataRow_(rq, 1) : 1;
+  const days = (rl >= 2 ? rq.getRange(2, 1, rl - 1, 1).getValues() : []).map(function (r) { const d = r[0] instanceof Date ? r[0] : toDate_(r[0]); return d ? dayStart_(d) : null; }).filter(Boolean);
+  const reqW = days.filter(thisW).length, reqP = days.filter(lastW).length;
+  row([], 'gap'); row(['2 · طلبات مسار التطوير الشخصي'], 'section');
+  row(['', 'الأسبوع ده', 'الأسبوع اللي فات'], 'head');
+  row(['عدد الطلبات', reqW, reqP], 'Held');
+  // 3 · doctors' rating with a grade
+  const grade = function (v) { return v >= 5 ? 'ممتاز' : v >= 4 ? 'جيد جداً' : v >= 3 ? 'جيد' : v >= 2 ? 'مقبول' : 'ضعيف'; };
+  const gColor = function (v) { return v >= 4 ? '#1e7a46' : v >= 3 ? '#9a6a00' : '#a52f2f'; };
+  const byDoc = {}; evals.forEach(function (e) { if (e.dr) (byDoc[e.doctor] = byDoc[e.doctor] || []).push(e); });
+  const docs = Object.keys(byDoc).map(function (n) { const l = byDoc[n]; return { n: n, v: avg_(l, function (e) { return e.dr; }), c: l.length, w: l.filter(function (e) { return thisW(dayStart_(e.d)); }).length }; })
+    .sort(function (a, b) { return b.v - a.v || b.c - a.c; });
+  row([], 'gap'); row(['3 · تقييم الدكاترة (5 = ممتاز)'], 'section'); const cR3 = rows.length;
+  row(['الدكتور', 'متوسط التقييم', 'التقدير', 'عدد التقييمات', 'منهم الأسبوع ده'], 'head');
+  if (!docs.length) row(['لسه مفيش تقييمات.'], 'note');
+  docs.forEach(function (d) { row([d.n, d.v, grade(d.v), d.c, d.w], 'Held', 3, gColor(d.v)); });
+  row(['التقدير: 5 ممتاز · من 4 جيد جداً · من 3 جيد · من 2 مقبول · أقل من 2 ضعيف'], 'note');
+  // 4 · groups with the most cancellations
   const mStart = Number(Utilities.formatDate(new Date(), tz, 'yyyyMM') + '01');
-  const canc = allL.filter(function (x) { return x.wasCancelled && x.origDay >= mStart && x.origDay <= today; });
-  const byR = {}, byG = {};
-  canc.forEach(function (x) { const r = x.reason || 'من غير سبب مكتوب'; byR[r] = (byR[r] || 0) + 1; byG[x.group] = (byG[x.group] || 0) + 1; });
-  const rk = Object.keys(byR).sort(function (a, b) { return byR[b] - byR[a]; }), gk = Object.keys(byG).sort(function (a, b) { return byG[b] - byG[a]; });
-  row([], 'gap'); row(['4 · المحاضرات اللي اتلغت الشهر ده (' + canc.length + ')'], 'section'); const cR4 = rows.length;
-  if (!canc.length) row(['مفيش محاضرات اتلغت الشهر ده.'], 'note');
-  else {
-    row(['السبب', 'عدد المحاضرات'], 'head');
-    rk.forEach(function (r) { row([r, byR[r]], 'Held'); });
-    row([], 'gap');
-    row(['الجروب', 'اتلغت', 'اتعملت', 'نسبة الإلغاء'], 'head');
-    gk.forEach(function (g) { const held = allL.filter(function (x) { return x.group === g && x.status === 'Held' && x.day >= mStart; }).length;
-      row([g, byG[g], held, Math.round(byG[g] / (held + byG[g]) * 100) + '%'], 'Held'); });
-  }
+  const cg = {};
+  allL.forEach(function (x) {
+    if (!x.wasCancelled) return;
+    const c = cg[x.group] = cg[x.group] || { w: 0, m: 0 };
+    if (thisW(x.origDay)) c.w++;
+    if (x.origDay >= mStart && x.origDay <= today) c.m++;
+  });
+  const cRows = Object.keys(cg).filter(function (g) { return cg[g].m || cg[g].w; }).map(function (g) {
+    const held = allL.filter(function (x) { return x.group === g && x.status === 'Held' && x.day >= mStart && x.day <= today; }).length;
+    return [g, cg[g].w, cg[g].m, held + cg[g].m ? Math.round(cg[g].m / (held + cg[g].m) * 100) : 0];
+  }).sort(function (a, b) { return b[2] - a[2] || b[3] - a[3]; });
+  row([], 'gap'); row(['4 · أعلى الجروبات في إلغاء المحاضرات'], 'section'); const cR4 = rows.length;
+  row(['الجروب', 'اتلغى الأسبوع ده', 'اتلغى الشهر ده', 'نسبة الإلغاء الشهر ده'], 'head');
+  if (!cRows.length) row(['مفيش محاضرات اتلغت الشهر ده.'], 'note');
+  cRows.forEach(function (c) { row([c[0], c[1], c[2], c[3] + '%'], 'Held', 3, c[2] >= 2 ? '#a52f2f' : null); });
+  // 5 · attendance in every lecture of the module each group is studying now
+  const curMod = {}; groups.forEach(function (g) {
+    const gr = runs.filter(function (r) { return r.group === g && r.startKey <= today; }).sort(function (a, b) { return b.end - a.end; });
+    if (gr[0]) curMod[g] = gr[0].module;
+  });
+  const lec = lectureAttendanceRows_(D).filter(function (r) { return curMod[r.x.group] === r.x.module; })
+    .sort(function (a, b) { return a.x.group.localeCompare(b.x.group) || a.x.d - b.x.d; });
+  row([], 'gap'); row(['5 · الحضور في كل محاضرة – المادة الحالية لكل جروب'], 'section'); const cR5 = rows.length;
+  row(['الجروب', 'المادة', 'المحاضرة', 'اليوم', 'حضروا', 'عدد الطلبة', 'نسبة الحضور'], 'head');
+  if (!lec.length) row(['لسه مفيش محاضرات اتسجل فيها حضور في المواد الحالية.'], 'note');
+  let lastG = '';
+  lec.forEach(function (r) {
+    row([r.x.group === lastG ? '' : r.x.group, r.x.group === lastG ? '' : r.x.module, 'محاضرة ' + r.x.n + ' من ' + (r.x.of || '?'), shortDate_(r.x.d) + ' · ' + arDay_(r.x.d),
+         r.came, r.should || '—', r.pct === null ? '—' : r.pct + '%'], 'Held', 7, color(r.pct));
+    lastG = r.x.group;
+  });
+  row(['كل المحاضرات من أول يوم تسجيل حضور، والمواد اللي خلصت: تاب Lecture Attendance'], 'note');
+  // history · week by week (Saturday → Friday)
+  row([], 'gap'); row(['سجل الأسابيع (الأحدث فوق)'], 'histsec');
+  row(['الأسبوع', 'نسبة الحضور', 'محاضرات اتعملت', 'محاضرات اتلغت', 'طلبات مسار التطوير', 'تقييم الدكاترة'], 'head');
   const weeks = [];
-  for (let i = 5; i >= 0; i--) {
-    const e = dayKeyAdd_(today, -7 * i), b0 = dayKeyAdd_(e, -6), p = attOver(function (k) { return k >= b0 && k <= e; });
-    weeks.push([dayKeyToIso_(b0).slice(5).split('-').reverse().join('/') + '–' + dayKeyToIso_(e).slice(5).split('-').reverse().join('/'), p === '' ? null : p]);
+  for (let i = 0; i < 8; i++) {
+    const a = dayKeyAdd_(sat, -7 * i), b = dayKeyAdd_(a, 6), inside = inWeek(a, b);
+    let s = 0, c = 0; groups.forEach(function (g) { const w = groupWeek(g, inside); s += w.studs; c += w.came; });
+    const ev = evals.filter(function (e) { return e.dr && inside(dayStart_(e.d)); });
+    const pc = s ? Math.round(c / s * 100) : null;
+    weeks.push([fmt(a) + ' → ' + fmt(b) + (i === 0 ? ' (الحالي)' : ''), pc === null ? '—' : pc + '%',
+      allL.filter(function (x) { return x.status === 'Held' && inside(x.day); }).length, allL.filter(function (x) { return x.wasCancelled && inside(x.origDay); }).length,
+      days.filter(inside).length, ev.length ? avg_(ev, function (e) { return e.dr; }) : '—', pc]);
   }
-  writeReport_('Manager Summary', '#c0392b', W, rows, [280, 170, 170, 190, 220, 120], [
-    { row: cR1, type: 'LINE', title: 'نسبة الحضور – آخر 6 أسابيع', header: ['الأسبوع', 'الحضور %'], data: weeks, max: 100, h: 280 },
-    { row: cR2, type: 'BAR', title: 'نسبة الحضور الأسبوع ده – لكل جروب', header: ['الجروب', 'الحضور %'], data: gChart, max: 100, colors: ['#2e7d5b'], h: Math.max(220, 60 + gChart.length * 32) },
-    { row: cR4, type: 'PIE', title: 'أسباب الإلغاء الشهر ده', header: ['السبب', 'محاضرات'], data: rk.map(function (k) { return [k, byR[k]]; }), h: 260 }
+  weeks.forEach(function (w) { row(w.slice(0, 6), 'Finished', 2, color(w[6])); });
+  const rp = writeReport_('Manager Summary', '#c0392b', W, rows, [260, 220, 260, 110, 150, 120, 140], [
+    { row: cR1, type: 'BAR', title: 'نسبة الحضور الأسبوع ده – والهدف ' + TARGET + '%', header: ['الجروب', 'الحضور %', 'الهدف'], data: chart1, max: 100, colors: ['#2e7d5b', '#c0392b'], h: Math.max(240, 70 + chart1.length * 36) },
+    { row: cR3, type: 'BAR', title: 'تقييم الدكاترة (من 5)', header: ['الدكتور', 'التقييم'], data: docs.map(function (d) { return [d.n, d.v]; }), max: 5, colors: ['#7a4bb3'], h: Math.max(220, 60 + docs.length * 30) },
+    { row: cR4, type: 'COLUMN', title: 'الإلغاء الشهر ده – لكل جروب', header: ['الجروب', 'اتلغى'], data: cRows.map(function (c) { return [c[0], c[2]]; }), colors: ['#c0392b'], h: 240 }
   ]);
+  try { if (rp.getIndex() !== 1) { SpreadsheetApp.getActive().setActiveSheet(rp); SpreadsheetApp.getActive().moveActiveSheet(1); } } catch (e) {}   // first tab in the sheet
+  try { buildLectureAttendance_(D); } catch (e) { Logger.log('lecture attendance: ' + e); }
   return buildFollowUp_(D);
+}
+
+const AR_DAYS = { Saturday: 'السبت', Sunday: 'الأحد', Monday: 'الاثنين', Tuesday: 'الثلاثاء', Wednesday: 'الأربعاء', Thursday: 'الخميس', Friday: 'الجمعة' };
+function arDay_(d) { const e = Utilities.formatDate(d, SETTINGS.TIMEZONE, 'EEEE'); return AR_DAYS[e] || e; }
+/** Every lecture that took place (from the attendance start day): group, module, lecture n of N, how many came. */
+function lectureAttendanceRows_(D) {
+  const byGroupAll = {};
+  D.students.forEach(function (s) { (byGroupAll[s[SC.GROUP - 1]] = byGroupAll[s[SC.GROUP - 1]] || []).push(s); });
+  const act = activeByGroup_(D), out = [];
+  Object.keys(D.byGroup).forEach(function (g) {
+    D.byGroup[g].forEach(function (x) {
+      if (!x.isLecture || x.status !== 'Held' || !x.tracked) return;
+      const came = (byGroupAll[g] || []).filter(function (s) { return attended_(D, String(s[SC.KEY - 1]).trim(), x.day); }).length;
+      const should = (act[g] || []).filter(function (s) { return startedBy_(s, x.day); }).length;
+      out.push({ x: x, came: came, should: should, pct: should ? Math.round(came / should * 100) : null });
+    });
+  });
+  return out.sort(function (a, b) { return b.x.d - a.x.d || a.x.group.localeCompare(b.x.group); });
+}
+function buildLectureAttendance_(D) {
+  const tz = SETTINGS.TIMEZONE, W = 8, rows = [], list = lectureAttendanceRows_(D);
+  const row = function (v, k, cc, color) { rows.push([v, k, color ? cc : 0, color]); };
+  const color = function (p) { return p === null ? null : p >= 50 ? '#1e7a46' : p >= 30 ? '#9a6a00' : '#a52f2f'; };
+  row(['حضور المحاضرات'], 'title');
+  row(['كل محاضرة اتعملت من ' + (D.from ? shortDate_(D.from) : '—') + ' (أول يوم تسجيل حضور) · الأحدث فوق · "حضروا" = سجلوا حضورهم من الصفحة يوم المحاضرة · آخر تحديث ' + Utilities.formatDate(new Date(), tz, 'dd/MM HH:mm')], 'note');
+  // per module: average of its lectures
+  const mods = {}, order = [];
+  list.forEach(function (r) { const k = r.x.group + '|' + r.x.module; if (!mods[k]) { mods[k] = []; order.push(k); } mods[k].push(r); });
+  row([], 'gap'); row(['1 · لكل مادة'], 'section'); const cR1 = rows.length;
+  row(['الجروب', 'المادة', 'الدكتور', 'محاضرات اتسجل فيها حضور', 'متوسط اللي حضروا', 'عدد الطلبة', 'متوسط نسبة الحضور'], 'head');
+  if (!order.length) row(['لسه مفيش محاضرات اتسجل فيها حضور.'], 'note');
+  const chart = [];
+  order.forEach(function (k) {
+    const l = mods[k], x = l[0].x, came = Math.round(l.reduce(function (a, r) { return a + r.came; }, 0) / l.length);
+    const sh = l.filter(function (r) { return r.should; }), should = sh.length ? Math.round(sh.reduce(function (a, r) { return a + r.should; }, 0) / sh.length) : 0;
+    const pct = sh.length ? Math.round(sh.reduce(function (a, r) { return a + r.came; }, 0) / sh.reduce(function (a, r) { return a + r.should; }, 0) * 100) : null;
+    row([x.group, x.module, x.doctor || '—', l.length + ' من ' + (x.of || l.length), came, should || '—', pct === null ? '—' : pct + '%'], 'Held', 7, color(pct));
+    if (pct !== null) chart.push([x.group.replace('EIU MBA · ', '') + ' · ' + x.module.split(' - ')[0], pct]);
+  });
+  row([], 'gap'); row(['2 · كل محاضرة'], 'section');
+  row(['التاريخ', 'الجروب', 'المادة', 'المحاضرة', 'الدكتور', 'حضروا', 'عدد الطلبة', 'نسبة الحضور'], 'head');
+  list.forEach(function (r) {
+    row([shortDate_(r.x.d) + ' · ' + arDay_(r.x.d), r.x.group, r.x.module, 'محاضرة ' + r.x.n + ' من ' + (r.x.of || '?'), r.x.doctor || '—',
+         r.came, r.should || '—', r.pct === null ? '—' : r.pct + '%'], 'Held', 8, color(r.pct));
+  });
+  writeReport_('Lecture Attendance', '#2e7d5b', W, rows, [190, 200, 260, 140, 210, 90, 100, 120], [
+    { row: cR1, type: 'BAR', title: 'متوسط نسبة الحضور لكل مادة', header: ['المادة', 'الحضور %'], data: chart.slice(0, 15), max: 100, colors: ['#2e7d5b'], h: Math.max(240, 60 + Math.min(chart.length, 15) * 30) }
+  ]);
+  return list;
 }
 
 /** "Students Follow-up" tab: active students who stopped attending (2+ lectures in a row) or never checked in. */
 function buildFollowUp_(D) {
   const W = 8, rows = [], act = activeByGroup_(D);
   const row = function (v, k, cc, color) { rows.push([v, k, color ? cc : 0, color]); };
-  const follow = [];
+  const follow = []; let skipped = 0;
   D.students.forEach(function (s) {
-    if (String(s[SC.STATUS - 1]) !== ACTIVE_STATUS) return;
+    // only "Still studying" students whose module start date ("Its Start") is filled in the Students tab
+    if (String(s[SC.STATUS - 1]).trim().toLowerCase() !== ACTIVE_STATUS.toLowerCase()) return;
+    const start = toDate_(s[SC.START_DATE - 1]); if (!start || dayStart_(start) > D.today) { skipped++; return; }
     const key = String(s[SC.KEY - 1] || '').trim(), L = D.byGroup[s[SC.GROUP - 1]]; if (!key || !L) return;
     const held = L.filter(function (x) { return x.status === 'Held' && x.isLecture && x.tracked && startedBy_(s, x.day); });
     if (held.length < 2) return;
@@ -1539,7 +1676,8 @@ function buildFollowUp_(D) {
   follow.sort(function (a, b) { return (a[4] === b[4] ? 0 : a[4] === STOP ? -1 : 1) || b[5] - a[5] || a[2].localeCompare(b[2]) || a[0].localeCompare(b[0]); });
   const fg = {}; follow.forEach(function (f) { const x = fg[f[2]] = fg[f[2]] || [0, 0]; x[f[4] === STOP ? 0 : 1]++; });
   row(['متابعة الطلبة'], 'title');
-  row(['آخر تحديث ' + Utilities.formatDate(new Date(), SETTINGS.TIMEZONE, 'dd/MM/yyyy HH:mm') + ' · طلبة "' + ACTIVE_STATUS + '" غابوا آخر محاضرتين أو أكتر ورا بعض · الحضور محسوب من ' + (D.from ? shortDate_(D.from) : '—')], 'note');
+  row(['آخر تحديث ' + Utilities.formatDate(new Date(), SETTINGS.TIMEZONE, 'dd/MM/yyyy HH:mm') + ' · طلبة "' + ACTIVE_STATUS + '" ليهم تاريخ بداية مادة (Its Start) وغابوا آخر محاضرتين أو أكتر ورا بعض من بعد تاريخ بدايتهم · الحضور محسوب من ' + (D.from ? shortDate_(D.from) : '—')], 'note');
+  if (skipped) row([skipped + ' طالب "' + ACTIVE_STATUS + '" مش في القايمة لأن خانة Its Start فاضية أو تاريخها لسه ماجاش – تقدروا تكملوها في تاب Students'], 'note');
   row([], 'gap'); row(['1 · لكل جروب'], 'section'); const cR1 = rows.length;
   row(['الجروب', 'بطّل يحضر', 'ما سجلش حضور خالص', 'طلبة بيدرسوا', 'نسبة اللي محتاجين متابعة'], 'head');
   const gk = Object.keys(fg).sort(function (a, b) { return (fg[b][0] + fg[b][1]) - (fg[a][0] + fg[a][1]); });
@@ -1576,6 +1714,7 @@ function refreshAttendance_(onlyIfDue) {
   return buildAttendanceReport_(D, runs);
 }
 function menuLiveAdd() { try { const u = String(sheet_(T.SETTINGS).getRange('B33').getValue() || '').trim(); const m = addMissingLiveRows_(u); PropertiesService.getScriptProperties().setProperty('LIVE_ADD', 'v8.8'); toast_('Lectures: ' + m); } catch (e) { toast_('Failed: ' + e.message); } }
+function menuArchive() { const P = PropertiesService.getScriptProperties(); if (P.getProperty('ARCH_V') === 'v9.4') { toast_('Already archived'); return; } try { const m = archiveOld_(new Date(2026, 10, 8), new Date(2026, 9, 15)); P.setProperty('ARCH_V', 'v9.4'); toast_('Archive: ' + m); } catch (e) { toast_('Archive failed: ' + e.message); } }
 function menuDevClients() { try { apEnsure_(); devEnsureServices_(); toast_('Development clients: ' + syncDevClients_()); } catch (e) { toast_('Development clients failed: ' + e.message); try { sheet_(T.SETTINGS).getRange('B42').setValue('Sync failed: ' + e.message); } catch (x) {} } }
 function menuAttendance() { toast_('Attendance updated · groups ' + refreshAttendance_()); }
 
@@ -2082,7 +2221,9 @@ function importSources() {
     try { sheet_(T.SETTINGS).getRange('D13').setValue('Hourly import skipped (sync busy) at ' + Utilities.formatDate(new Date(), SETTINGS.TIMEZONE, 'dd/MM HH:mm')); } catch (x) {}
     return;
   }
-  try { const r = importSources_(); sheet_(T.SETTINGS).getRange('D13').setValue('');
+  try { try { ensureHeaders_(); } catch (e) {}
+    try { if (PropertiesService.getScriptProperties().getProperty('ARCH_V') !== 'v9.4') menuArchive(); } catch (e) {}   // the one-time archive also runs by itself
+    const r = importSources_(); sheet_(T.SETTINGS).getRange('D13').setValue('');
     try { syncDevClients_(); } catch (e) { sheet_(T.SETTINGS).getRange('B42').setValue('Sync failed: ' + e.message); }
     return r; } finally { lock.releaseLock(); }
 }
@@ -2222,6 +2363,7 @@ function setup() {
   }
   const backup = String(set.getRange('B15').getValue() || '').trim();
   if (backup && !String(set.getRange('B16').getValue() || '').trim()) Logger.log(restoreFromBackup_(backup));
+  Logger.log(ensureHeaders_());
   repairResponses_();
   unifyDoctors_();
   ensureValidations_();
@@ -2240,6 +2382,10 @@ function setup() {
     set.getRange('C33').setValue('Lectures from the import day to the last row of this sheet were copied once, exactly as written (merged cells included). After that the Lectures tab is edited here.');
     if (String(set.getRange('A35').getValue()).trim()) set.getRange('C35').setValue('Not used any more (v6.6) – the live lectures sheet is the only source.');
     Logger.log(msg);
+  }
+  if (PropertiesService.getScriptProperties().getProperty('ARCH_V') !== 'v9.4') {
+    PropertiesService.getScriptProperties().setProperty('ARCH_V', 'v9.4');
+    try { Logger.log('Archive: ' + archiveOld_(new Date(2026, 10, 8), new Date(2026, 9, 15))); } catch (e) { Logger.log('Archive: ' + e); PropertiesService.getScriptProperties().deleteProperty('ARCH_V'); }
   }
   if (oldLec && PropertiesService.getScriptProperties().getProperty('LIVE_ADD') !== 'v8.8') {
     PropertiesService.getScriptProperties().setProperty('LIVE_ADD', 'v8.8');
@@ -2275,17 +2421,18 @@ function onOpen() {
     .addItem('Import students from EIU / AITU sheets now', 'menuImport')
     .addItem('Sync students from Students DB now', 'menuSync')
     .addItem('Rebuild dashboard module list', 'menuDash')
-    .addItem('Repair response formulas', 'menuRepair')
+    .addItem('Repair: headers + response formulas', 'menuRepair')
     .addItem('Lectures: sort by date + update Group Schedule', 'menuLectures')
     .addItem('Attendance: update report + Students columns now', 'menuAttendance')
     .addItem('Development path: copy Salma + Sabreen clients now', 'menuDevClients')
     .addItem('Lectures: add new lectures from the live sheet (once)', 'menuLiveAdd')
+    .addItem('Archive: Lectures before 8/11 + Assignments before 15/10 (once)', 'menuArchive')
     .addToUi();
 }
 function menuImport() { toast_(importSources_()); }
 function menuSync() { toast_('Students DB → ' + syncFromDb_()); }
 function menuDash() { refreshDashboard_(); toast_('Dashboard rebuilt'); }
-function menuRepair() { toast_('Formulas restored on ' + repairResponses_() + ' rows'); }
+function menuRepair() { const h = ensureHeaders_(); toast_(h + ' · response formulas to row ' + repairResponses_()); }
 
 /* =========================== Assignments + Lectures automation =========================== */
 // Assignments: A Account Manager | B Session Date | C Module | D Case | E Dr. Name | F Program | G Acc. | H Link | I Students
@@ -2454,6 +2601,29 @@ function writeResponseFormulas_(sh, fromRow, n) {
   sh.getRange(fromRow, 8, n, 1).setNumberFormat('dd/mm/yyyy');
   sh.getRange(fromRow, 10, n, 1).setNumberFormat('hh:mm AM/PM');
 }
+/** Header rows the script relies on – written back if someone cleared them (data rows are not touched). */
+const FR_HEAD = ['Date & Time', 'Phone', 'Accreditation', 'Module', 'Page Opened At', 'Submission ID', 'Source', 'Attendance Date', 'Day',
+                 'Check-in Time', 'Entry', 'Data Quality', 'Phone Key', 'Student Name', 'Group', 'Typed Name'];
+function ensureHeaders_() {
+  const fixed = [];
+  const put = function (name, head) {
+    const sh = sheet_(name); if (!sh) return;
+    const cur = sh.getRange(1, 1, 1, head.length).getValues()[0];
+    if (cur.every(function (v, i) { return String(v).trim() === head[i]; })) return;
+    const out = cur.map(function (v, i) { return String(v).trim() ? v : head[i]; });   // only empty header cells are filled
+    if (out.some(function (v, i) { return v !== cur[i]; })) {
+      sh.getRange(1, 1, 1, head.length).setValues([out]).setFontWeight('bold').setBackground('#0c2536').setFontColor('#ffffff');
+      fixed.push(name);
+    }
+  };
+  put(SETTINGS.RESPONSES_SHEET, FR_HEAD);
+  put(EV.SHEET, EV.HEAD);
+  put(AP.REQ, AP.REQ_HEAD);
+  put(AP.SVC, AP.SVC_HEAD);
+  put(DEV.SHEET, DEV.HEAD);
+  return fixed.length ? 'headers restored: ' + fixed.join(', ') : 'headers ok';
+}
+
 function repairResponses_() {
   const sh = sheet_(SETTINGS.RESPONSES_SHEET);
   const n = Math.max(firstEmptyRow_(sh) - 2 + 200, 999);
